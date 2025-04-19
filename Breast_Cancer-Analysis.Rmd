@@ -1,0 +1,172 @@
+---
+title: "Breast Cancer Analysis"
+author: "Luke Wamalwa"
+date: "2025-04-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(pROC)
+library(caret)
+library(tidyr)
+library(ggpmisc)
+library(ggstatsplot)
+```
+
+
+## Load and Split Data
+```{r}
+Cancer <- read.csv("C:/Users/lukew/Downloads/Cancer_Data.csv")
+Cancer$diagnosis <- factor(Cancer$diagnosis)
+cancer <- Cancer[, 2:12]
+names(cancer) <- gsub(" ", "_", names(cancer))
+
+set.seed(123)
+train_index <- createDataPartition(cancer$diagnosis, p = 0.6, list = FALSE)
+train_data <- cancer[train_index, ]
+temp_data <- cancer[-train_index, ]
+val_index <- createDataPartition(temp_data$diagnosis, p = 0.5, list = FALSE)
+val_data <- temp_data[val_index, ]
+test_data <- temp_data[-val_index, ]
+```
+
+## Exploratory Visualization
+```{r}
+ggplot(cancer, aes(x = diagnosis, y = after_stat(count)/nrow(cancer), fill = diagnosis)) +
+  geom_bar() +
+  xlab('Diagnosis') +
+  ylab('Percent of Participants') +
+  theme_classic()
+```
+
+## ggbetweenstats Boxplots for All Predictors
+```{r}
+dynamic_ggbetweenstats <- function(data, x, y_var) {
+  ggbetweenstats(
+    data = data,
+    x = {{ x }},
+    y = !!sym(y_var),
+    type = "parametric",
+    messages = FALSE,
+    results.subtitle = TRUE,
+    title = paste("Distribution of", y_var, "by Diagnosis"),
+    xlab = "Diagnosis",
+    ylab = y_var,
+    mean.ci = TRUE
+  )
+}
+predictor_vars <- names(cancer)[names(cancer) != "diagnosis"]
+lapply(predictor_vars, function(var) print(dynamic_ggbetweenstats(cancer, x = diagnosis, y_var = var)))
+```
+
+## Initial Model on Training Data
+```{r}
+glm_train <- glm(diagnosis ~ ., data = train_data, family = binomial)
+summary(glm_train)
+confint(glm_train)
+```
+
+## Reduced Model on Validation Set
+```{r}
+glm_valid_refined <- glm(diagnosis ~ texture_mean + concavity_mean, 
+                         data = val_data, family = binomial)
+summary(glm_valid_refined)
+confint(glm_valid_refined)
+
+val_data$predicted_prob_refined <- predict(glm_valid_refined, newdata = val_data, type = "response")
+val_data$predicted_class_refined <- factor(ifelse(val_data$predicted_prob_refined > 0.5, "M", "B"),
+                                           levels = levels(val_data$diagnosis))
+confusionMatrix(val_data$predicted_class_refined, val_data$diagnosis)
+```
+
+## Model Comparison
+```{r}
+base_formula <- diagnosis ~ texture_mean + concavity_mean
+additional_vars <- c("area_mean", "smoothness_mean", "radius_mean", "compactness_mean", "symmetry_mean")
+model_list <- list(Model_1 = glm(base_formula, data = val_data, family = binomial))
+results_df <- data.frame()
+
+for (i in seq_along(additional_vars)) {
+  var <- additional_vars[i]
+  formula <- as.formula(paste("diagnosis ~ texture_mean + concavity_mean +", var))
+  model_list[[paste0("Model_", i + 1)]] <- glm(formula, data = val_data, family = binomial)
+}
+
+for (i in seq_along(model_list)) {
+  model_name <- names(model_list)[i]
+  model <- model_list[[i]]
+  val_data[[paste0("predicted_", model_name)]] <- predict(model, newdata = val_data, type = "response")
+  predicted_class <- factor(ifelse(val_data[[paste0("predicted_", model_name)]] > 0.5, "M", "B"),
+                            levels = levels(val_data$diagnosis))
+  cm <- confusionMatrix(predicted_class, val_data$diagnosis)
+  acc <- cm$overall["Accuracy"]
+  auc_val <- auc(val_data$diagnosis, val_data[[paste0("predicted_", model_name)]])
+  results_df <- rbind(results_df, data.frame(Model = model_name, AIC = AIC(model),
+                                             Deviance = model$deviance, Accuracy = round(acc, 4), AUC = round(auc_val, 4)))
+}
+results_df
+```
+
+## Model Comparison Plot
+```{r}
+results_df$Model <- as.character(1:nrow(results_df))
+results_long <- pivot_longer(results_df, cols = c(Accuracy, AUC, AIC), names_to = "Metric", values_to = "Value")
+
+ggplot(results_long, aes(x = Model, y = Value, fill = Metric)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~ Metric, scales = "free_y") +
+  labs(title = "Model Comparison: Accuracy, AUC, and AIC",
+       x = "Model", y = "Metric Value") +
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal(base_size = 14) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+```
+
+## Final Model on Test Set.
+```{r}
+final_model <- glm(diagnosis ~ texture_mean + concavity_mean + radius_mean, data = val_data, family = binomial)
+
+# Predictions
+test_data$predicted_prob <- predict(final_model, newdata = test_data, type = "response")
+test_data$predicted_class <- factor(ifelse(test_data$predicted_prob > 0.5, "M", "B"), levels = levels(test_data$diagnosis))
+confusionMatrix(test_data$predicted_class, test_data$diagnosis)
+
+roc_final <- roc(test_data$diagnosis, test_data$predicted_prob, levels = c("B", "M"))
+plot.roc(roc_final, main = "Final Model: ROC Curve (Test Set)")
+auc(roc_final)
+```
+
+## Effect Visualization of Texture Mean
+```{r}
+texture_seq <- seq(min(test_data$texture_mean), max(test_data$texture_mean), length.out = 100)
+new_data <- data.frame(
+  texture_mean = texture_seq,
+  concavity_mean = mean(test_data$concavity_mean),
+  radius_mean = mean(test_data$radius_mean)
+)
+new_data$predicted_prob <- predict(final_model, newdata = new_data, type = "response")
+
+ggplot(new_data, aes(x = texture_mean, y = predicted_prob)) +
+  geom_line(color = "#0073C2FF", size = 1.2) +
+  labs(
+    title = "Effect of Texture Mean on Probability of Malignancy",
+    x = "Texture Mean",
+    y = "Predicted Probability"
+  ) +
+  annotate("text", x = max(new_data$texture_mean) - 1, y = 0.05, hjust = 1, vjust = 0, size = 4.5,
+           label = paste(
+             "logit(p) = -35.05 + 0.404*texture_mean\n",
+             "          + 29.67*concavity_mean\n",
+             "          + 1.62*radius_mean"
+           )) +
+  theme_minimal(base_size = 14)
+```
+
+
+
+
+## R Markdown
+
