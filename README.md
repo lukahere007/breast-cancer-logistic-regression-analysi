@@ -39,4 +39,5 @@ This project develops a logistic regression model to predict breast cancer diagn
 
 📊 Interactive Report
 
-👉 RPubs Report [https://rpubs.com/lukahere007/breast-cancer-logistic-regression]
+👉 [Report](https://rpubs.com/lukahere007/breast-cancer-logistic-regression)
+
