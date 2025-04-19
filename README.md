@@ -25,7 +25,7 @@ This project develops a logistic regression model to predict breast cancer diagn
 
     Formula:
     logit(p)=−35.05+0.404⋅texture_mean+29.67⋅concavity_mean+1.62⋅radius_mean
-    logit(p)=−35.05+0.404⋅texture_mean+29.67⋅concavity_mean+1.62⋅radius_mean
+
 
     Test Set Performance:
 
