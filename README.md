@@ -1,32 +1,42 @@
 🧬 Breast Cancer Malignancy Prediction with Logistic Regression
 
-This project explores logistic regression modeling to predict breast cancer diagnosis (malignant vs benign) using tumor characteristics extracted from digitized fine needle aspirates (FNA) of breast masses. The dataset was obtained from the UCI Machine Learning Repository.
-🔍 Key Highlights
+This project develops a logistic regression model to predict breast cancer diagnosis (malignant vs benign) using features extracted from digitized images of fine needle aspirates (FNA) of breast masses. The dataset comes from the UCI Machine Learning Repository.
+🔍 Project Overview
 
     Dataset: Breast Cancer Wisconsin (Diagnostic) Data Set (n = 569)
 
-    Goal: Build a predictive model using logistic regression
+    Objective: Use logistic regression to predict tumor malignancy
 
-    Techniques:
+    Pipeline:
 
-        Exploratory data analysis with ggstatsplot
+        Data visualization (ggplot2, ggstatsplot)
 
-        Correlation and feature selection
+        Correlation and multicollinearity analysis
 
-        Model comparison using AIC, AUC, and validation accuracy
+        Feature selection using AIC, deviance, accuracy, and AUC metrics
 
-        Training-validation-test split (60%-20%-20%)
+        Train-validation-test split (60%-20%-20%)
 
-    Final Model: Based on texture_mean, concavity_mean, and radius_mean
+        Final model evaluation on the test set
 
-    Performance:
+✅ Final Model Summary
 
-        Validation AUC: 0.993
+    Predictors: texture_mean, concavity_mean, radius_mean
 
-        Test Accuracy: 95.6%
+    Formula:
+    logit(p)=−35.05+0.404⋅texture_mean+29.67⋅concavity_mean+1.62⋅radius_mean
+    logit(p)=−35.05+0.404⋅texture_mean+29.67⋅concavity_mean+1.62⋅radius_mean
 
-        Test AUC: 0.974
+    Test Set Performance:
 
-📊 Live Demo
+        Accuracy: 90.3%
 
-👉 RPubs Report https://rpubs.com/lukahere007/breast-cancer-logistic-regression
+        Sensitivity: 92.96%
+
+        Specificity: 85.71%
+
+        AUC (ROC): 0.956
+
+📊 Interactive Report
+
+👉 RPubs Report [https://rpubs.com/lukahere007/breast-cancer-logistic-regression]
